@@ -1,0 +1,186 @@
+# Databricks notebook source
+#APARTADO F
+#A
+#Importamos la tabla de u data
+archivo=spark.table("u_data")
+
+#archivo.select("*").show()
+#Cogemos las columnas que nos interesan en este caso las peliculas y su rating
+itemRating=archivo.select("item_id","rating").rdd
+#Agrupamos los datos por la key que seria la id de la pelicula
+juntados=agrupacion.groupByKey().mapValues(list)
+#Utilizamos un mapValues pra analizar el diccionario y hacer la media de cada pelicula
+media=juntados.mapValues(lambda x: sum(x)/len(x))
+print(media.take(10))
+print("*"*25)
+#B
+#Filtramos por los que son mayores o iguales a 3
+resultado=media.filter(lambda x: x[1]>=3)
+print(resultado.take(10))
+
+
+# COMMAND ----------
+
+#APARTADO E
+#A
+
+nombres = ['Juan', 'Jimena', 'Luis', 'Cristian', 'Laura', 'Lorena', 'Cristina', 'Jacobo', 'Jorge']
+
+rdd=sc.parallelize(nombres)
+
+agrupados=rdd.map(lambda x: (x[0], x)).groupByKey().mapValues(list)
+
+print(agrupados.collect())
+
+print("*"*25)
+#B
+
+noRepetidos=rdd.distinct().take(5)
+
+print(noRepetidos)
+
+print("*"*25)
+#C
+
+#Se utiliza sample para coger una muestra, false para que se puedan repetir y 0.5 es la cantidad de datos que quieres (50 por ciento)
+muestra=rdd.sample(False, 0.5)
+
+print(muestra.collect())
+
+# COMMAND ----------
+
+#APARTADO D
+#A
+#Libreria para limpiar texto
+import re
+
+archivo=sc.textFile("/FileStore/tables/quijote-2.txt")
+#Utilizamos flatMap para aplanar el texto y split para dividirlo ya que esta todo junto
+archivo=archivo.flatMap(lambda x: x.split())
+
+def limpiar_palabra(palabra):
+    # Elimina signos de puntuación y convertir a minúsculas
+    return re.sub(r'[^\w\s]', '', palabra).lower()
+#Limpiamos el texto y eliminamos las palabras vacias
+dataLimpia=archivo.map(limpiar_palabra).filter(lambda x: x)
+
+#print(dataLimpia.collect())
+
+print("*"*25)
+#B
+
+dulcinea=dataLimpia.filter(lambda x: x=='dulcinea').count()
+rocinante=dataLimpia.filter(lambda x: x=='rocinante').count()
+
+print("Dulcinea aparece",dulcinea,"veces")
+print("Rocinante aparece",rocinante,"veces")
+
+print("*"*25)
+#C
+#Primero añadimos el valor 1 a cada palabra
+mapeador=dataLimpia.map(lambda x: (x,1))
+#Ahora sumamos todas los valores de las palabras que sean iguales
+reductor=mapeador.reduceByKey(lambda x, y: x+y)
+#Ahora lo ordenamos de forma descendente por el tamaño del valor
+organizador=reductor.sortBy(lambda x: x[1], ascending=False)
+
+datos=organizador.collect()
+#cogemos el nombre y el contador y los imprimimos
+for nombre, contador in datos:
+    print(nombre,"-",contador)
+
+
+print("*"*25)
+#D
+#Utilizamos el save as text file para guardarlo en dbfs
+organizador.saveAsTextFile("/FileStore/QuijoteWordCount-2")
+
+# COMMAND ----------
+
+#APARTADO C
+#A
+ingles = ["hello", "table", "angel", "cat", "dog", "animal", "chocolate", "dark", "doctor", "hospital", "computer"]
+espanol = ["hola", "mesa", "angel", "gato", "perro", "animal", "chocolate", "oscuro", "doctor", "hospital", "ordenador"]
+rdd_ingles = sc.parallelize(ingles)
+rdd_espanol = sc.parallelize(espanol)
+#Utilizamos el zip para unir los dos rdd 
+rddFinal=rdd_ingles.zip(rdd_espanol)
+#utilizo un filter para coger los datos iguales y luego cogo solo el primero para mostrarlo
+iguales=rddFinal.filter(lambda x: x[0]==x[1]).map(lambda x: x[0])
+
+print(iguales.collect())
+print("*"*25)
+#B
+#Aqui cojo solo las que no son iguales y pongo las dos por que son distintas
+distintas=rddFinal.filter(lambda x: x[0]!=x[1])
+print(distintas.collect())
+print("*"*25)
+#C
+#Aqui utilizo un flatmap para simplificar la lista
+unicaLista=distintas.flatMap(lambda x: x)
+print(unicaLista.collect())
+print("*"*25)
+#D
+#Cojo las palabras que como primera inicial tienen las vocales y las que no las mando para otro grupo
+vocales=unicaLista.filter(lambda x: x[0] in 'aeiou')
+consonantes=unicaLista.filter(lambda x: x[0] not in 'aeiou')
+print("Vocales",vocales.collect())
+print("Consonantes",consonantes.collect())
+
+# COMMAND ----------
+
+#APARTADO B
+#A
+lista = 4,6,34,7,9,2,3,4,4,21,4,6,8,9,7,8,5,4,3,22,34,56,98
+#Aparte de crear la lista eliminamos los repetidos directamente aqui
+array=sc.parallelize(lista).distinct()
+#aplico un sorby y le quito el ascendente para que lo ordene de la manera que quiero
+array=array.sortBy(lambda x:x, ascending=False)
+#Utilizamos el take para coger los x primeros datos que le pongamos
+cincoPrimeros=array.take(5)
+
+print(cincoPrimeros)
+print("*"*25)
+#B
+#Cogemos el primer valor ya que es el mas grande
+print(cincoPrimeros[0])
+print("*"*25)
+#C
+#cogemso de la penultima posicion hacia atras
+print(cincoPrimeros[-2:])
+
+# COMMAND ----------
+
+#APARTADO A
+#A
+lista=['Mieres','Oviedo','Valencia','Madrid','Barcelona','Bilbao','Sevilla']
+#Convertimos las lista a rdd
+rdd=sc.parallelize(lista)
+#Utilizamos un filter para saber si hay a en la palabra
+tieneA=rdd.filter(lambda x: 'a' in x)
+#Utilizamos el collect para extraer los datos
+print(tieneA.collect())
+print("*"*25)
+#B
+#mapeamos la lista previamente limpiada de palabras sin a y contamos el numero de a en la palabra
+contarA=tieneA.map(lambda x: (x, x.count('a')))
+
+print(contarA.collect())
+print("*"*25)
+#C
+
+#Aqui utilizo primero un filter para que me de las que solo tienen un a y luego un map para que me de solo lo primero
+unaA=contarA.filter(lambda x: x[1]==1).map(lambda x: x[0])
+
+print(unaA.collect())
+print("*"*25)
+#D
+
+listaDos= [['Oviedo.Gijón','Valencia','Madrid.Barcelona','Bilbao.Sevilla'],['Murcia','San Sebastián','Melilla.Ceuta']]
+segRdd=sc.parallelize(listaDos)
+
+#Aqui utilizo primero un flatmap para aplanar las listas y luego otro para aplanar la lista despues del split que hago dentro del flatmap
+segRdd=segRdd.flatMap(lambda x: x).flatMap(lambda x: x.split('.'))
+#Ahora que tenemos la lista aplanada hacemos lo mismo que en los anteriores apartados, añadimos un .replace('á','a') por que uno de los datos tiene acento en la a y no lo estaba contando
+segRddA=segRdd.filter(lambda x: 'a' in x).map(lambda x: (x, x.replace('á','a').count('a')))
+print(segRddA.collect())
